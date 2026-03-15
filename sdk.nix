@@ -4,6 +4,15 @@ let
 
   baseURL = "https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v${version}";
 
+  getToolchainPlatform =
+    stdenv:
+    if stdenv.isLinux then
+      (if version == "1.0.0" then "gnu_linux" else "linux")
+    else if stdenv.isDarwin then
+      "macos"
+    else
+      throw "Unsupported platform";
+
   getPlatform =
     stdenv:
     if stdenv.isLinux then
@@ -54,6 +63,7 @@ in {
       targets ? [ ],
     }:
     let
+      toolchainPlatform = getToolchainPlatform stdenv;
       platform = getPlatform stdenv;
       arch = getArch stdenv;
 
@@ -66,7 +76,7 @@ in {
 
       srcs = [
         (fetchSDKFile "zephyr-sdk-${version}_${platform}-${arch}_minimal.tar.xz")
-      ] ++ map fetchSDKFile (map (target: "toolchain_${platform}-${arch}_${target}.tar.xz") targets);
+      ] ++ map fetchSDKFile (map (target: "toolchain_${toolchainPlatform}-${arch}_${target}.tar.xz") targets);
 
       passthru = {
         inherit platform arch targets;
@@ -115,13 +125,24 @@ in {
   # SDK with all targets selected
   sdkFull =
     let
-      inherit (self.sdk.passthru) platform arch;
-      mToolchain = builtins.match "toolchain_${platform}-${arch}_(.+)\.tar\.xz";
-      allTargets = map (x: builtins.head (mToolchain x)) (builtins.filter (f: mToolchain f != null) (lib.attrNames sdk'.files));
+      toolchainPlatform = getToolchainPlatform self.sdk.stdenv;
+      inherit (self.sdk.passthru) arch;
+      mToolchain = builtins.match "toolchain_${toolchainPlatform}-${arch}_(.+)\.tar\.xz";
+      allTargets =
+        builtins.concatMap
+          (filename: let
+            m = mToolchain filename;
+          in
+            if m == null then [ ]
+            else [
+              (builtins.head m)
+            ]
+          )
+        (lib.attrNames sdk'.files);
     in
-    self.sdk.override {
-      targets = allTargets;
-    };
+      self.sdk.override {
+        targets = allTargets;
+      };
 
   # Binary host tools provided by the Zephyr project.
   hosttools =

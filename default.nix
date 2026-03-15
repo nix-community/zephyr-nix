@@ -15,15 +15,16 @@ lib.makeScope newScope (self: let
   mkSdk = version: args: callPackage (import ./sdk.nix (lib.importJSON ./sdks/${version}.json)) args;
 
   sdks = lib.fix (self: {
+    "1_0_0" = mkSdk "1_0_0" {
+      python3 = python310;
+    };
     "0_17" = mkSdk "0_17" {
       python3 = python310;
     };
-
     "0_16" = mkSdk "0_16" {
       python3 = python310;
     };
-
-    latest = self."0_17";
+    latest = self."1_0_0";
   });
 
 in {
