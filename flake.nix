@@ -4,8 +4,11 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    pyproject-nix.url = "github:nix-community/pyproject.nix";
+    pyproject-nix.url = "github:pyproject-nix/pyproject.nix";
     pyproject-nix.inputs.nixpkgs.follows = "nixpkgs";
+
+    uv-python.url = "github:pyproject-nix/uv-python.nix";
+    uv-python.inputs.nixpkgs.follows = "nixpkgs";
 
     zephyr.url = "github:zephyrproject-rtos/zephyr/v4.3.0";
     zephyr.flake = false;
@@ -20,6 +23,7 @@
       nixpkgs,
       zephyr,
       pyproject-nix,
+      uv-python,
       nix-github-actions,
     }:
     (
@@ -66,6 +70,7 @@
             packages' = pkgs.callPackage ./. {
               zephyr-src = zephyr;
               inherit pyproject-nix;
+              python310 = pkgs.python310 or uv-python.packages.${system}."cpython-3.10";
             };
 
             sdks' = removeAttrs packages'.sdks [ "latest" ];

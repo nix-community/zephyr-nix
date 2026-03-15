@@ -6,7 +6,7 @@
 , gcc_multi
 , autoreconfHook
 , fetchFromGitHub
-, python310
+, python310 ? null
 }:
 
 lib.makeScope newScope (self: let
