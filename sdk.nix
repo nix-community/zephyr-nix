@@ -7,7 +7,7 @@ let
   getToolchainPlatform =
     stdenv:
     if stdenv.isLinux then
-      (if version == "1.0.0" then "gnu_linux" else "linux")
+      (if builtins.compareVersions version "1.0.0" >= 0 then "gnu_linux" else "linux")
     else if stdenv.isDarwin then
       "macos"
     else
