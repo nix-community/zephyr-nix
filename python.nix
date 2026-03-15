@@ -60,6 +60,23 @@ let
       ];
     });
 
+    pytest-notebook = super.pytest-notebook.overridePythonAttrs (old: {
+      doCheck = false;
+    });
+
+    spsdk = super.spsdk.overridePythonAttrs (old: {
+      dontCheckRuntimeDeps = true;
+      doCheck = false;
+      preBuild = (old.preBuild or "") + ''
+        export HOME=$(mktemp -d)
+      '';
+      postPatch = ''
+        substituteInPlace pyproject.toml \
+          --replace-warn "setuptools>=72.1,<74" "setuptools" \
+          --replace-warn "setuptools_scm<8.2" "setuptools_scm"
+      '';
+    });
+
     # Prefer existing vermin, otherwise fall back to manual packaging.
     vermin = super.vermin or (self.buildPythonPackage {
       pname = "vermin";
