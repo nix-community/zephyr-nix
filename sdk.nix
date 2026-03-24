@@ -108,7 +108,21 @@ in {
         mv zephyr-sdk-$version $out
 
         if [ -n "$(ls -A .)" ]; then
-          mv * $out
+          ${if builtins.compareVersions version "1.0.0" >= 0 then ''
+            mkdir -p $out/gnu
+
+            # Move gnu toolchains
+            for item in *-*zephyr-*; do
+              [ -e "$item" ] && mv "$item" $out/gnu/
+            done
+
+            # Move any remaining items
+            for item in *; do
+              [ -e "$item" ] && mv "$item" $out/ || true
+            done
+          '' else ''
+            mv * $out
+          ''}
         fi
 
         mkdir -p $out/nix-support
