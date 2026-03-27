@@ -7,6 +7,7 @@
 , autoreconfHook
 , fetchFromGitHub
 , python310 ? null
+, python312 ? null
 }:
 
 lib.makeScope newScope (self: let
@@ -15,16 +16,17 @@ lib.makeScope newScope (self: let
   mkSdk = version: args: callPackage (import ./sdk.nix (lib.importJSON ./sdks/${version}.json)) args;
 
   sdks = lib.fix (self: {
-    "1_0_0" = mkSdk "1_0_0" {
-      python3 = python310;
+    "1_0" = mkSdk "1_0_1" {
+      python3 = python312;
     };
+    "1_0_0" = lib.warn "zephyr-nix: SDK 1.0.0 is deprecated, please use the '1_0' alias which always points to the latest 1.0.x release" self."1_0";
     "0_17" = mkSdk "0_17" {
       python3 = python310;
     };
     "0_16" = mkSdk "0_16" {
       python3 = python310;
     };
-    latest = self."1_0_0";
+    latest = self."1_0";
   });
 
 in {

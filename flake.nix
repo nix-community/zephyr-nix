@@ -71,6 +71,7 @@
               zephyr-src = zephyr;
               inherit pyproject-nix;
               python310 = pkgs.python310 or uv-python.packages.${system}."cpython-3.10";
+              python312 = pkgs.python312;
             };
 
             sdks' = removeAttrs packages'.sdks [ "latest" ];
