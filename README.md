@@ -119,8 +119,8 @@ on the `packages` output, so you do not need your own `nixpkgs`:
 ``` nix
 zephyr-nix.packages.x86_64-linux.pythonEnv.override {
   packageOverrides = final: prev: {
-    spsdk = prev.spsdk.overridePythonAttrs (old: {
-      postPatch = "";
+    canopen = prev.canopen.overridePythonAttrs (old: {
+      doCheck = true;
     });
   };
 }
