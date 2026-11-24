@@ -63,6 +63,28 @@ let
     spsdk-pyocd = super.spsdk-pyocd.overridePythonAttrs (old: {
       dontCheckRuntimeDeps = true;
     });
+
+    # Prefer existing tree-sitter-cmake, otherwise build it from the sdist.
+    # PyPI has no Linux or macOS wheels for it.
+    tree-sitter-cmake = super.tree-sitter-cmake or (self.buildPythonPackage {
+      pname = "tree-sitter-cmake";
+      version = "0.7.2.post1";
+      pyproject = true;
+
+      src = pkgs.fetchurl {
+        url = "https://files.pythonhosted.org/packages/d0/f4/928d5378ef701577ef1b19658fc626a8c70b32447148898771a17c3c66a1/tree_sitter_cmake-0.7.2.post1.tar.gz";
+        hash = "sha256-ZKN1HKZ/NxEoIdZwV7jebsq1x+lNYFNGekt4zqs0hkA=";
+      };
+
+      build-system = [
+        self.setuptools
+        self.wheel
+      ];
+
+      optional-dependencies.core = [ self.tree-sitter ];
+
+      pythonImportsCheck = [ "tree_sitter_cmake" ];
+    });
   };
 
   python = python3.override (old: {
