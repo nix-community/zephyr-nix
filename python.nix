@@ -84,6 +84,13 @@ let
       '';
     });
 
+    # Nixpkgs omits spsdk from the spsdk-pyocd dependencies to break a
+    # cycle, so the runtime dependency check fails. spsdk depends on
+    # spsdk-pyocd, so spsdk is always present at runtime.
+    spsdk-pyocd = super.spsdk-pyocd.overridePythonAttrs (old: {
+      dontCheckRuntimeDeps = true;
+    });
+
     # Prefer existing vermin, otherwise fall back to manual packaging.
     vermin = super.vermin or (self.buildPythonPackage {
       pname = "vermin";
