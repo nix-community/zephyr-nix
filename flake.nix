@@ -10,7 +10,7 @@
     uv-python.url = "github:pyproject-nix/uv-python.nix";
     uv-python.inputs.nixpkgs.follows = "nixpkgs";
 
-    zephyr.url = "github:zephyrproject-rtos/zephyr/v4.3.0";
+    zephyr.url = "github:zephyrproject-rtos/zephyr/v4.5.0";
     zephyr.flake = false;
 
     nix-github-actions.url = "github:nix-community/nix-github-actions";
