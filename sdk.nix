@@ -4,10 +4,14 @@ let
 
   baseURL = "https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v${version}";
 
+  # SDK 1.0 renamed the GNU toolchain archives, moved them to gnu/, and added
+  # an LLVM toolchain.
+  isSdk1 = builtins.compareVersions version "1.0.0" >= 0;
+
   getToolchainPlatform =
     stdenv:
     let
-      gnuPrefix = (if builtins.compareVersions version "1.0.0" >= 0 then "gnu_" else "");
+      gnuPrefix = if isSdk1 then "gnu_" else "";
     in
     if stdenv.hostPlatform.isLinux then
       "${gnuPrefix}linux"
@@ -63,7 +67,10 @@ in {
       python3,
       fetchurl,
       lib,
+      zlib,
       targets ? [ ],
+      # For ZEPHYR_TOOLCHAIN_VARIANT=zephyr/llvm.
+      withLlvm ? false,
     }:
     let
       toolchainPlatform = getToolchainPlatform stdenv;
@@ -73,16 +80,19 @@ in {
       fetchSDKFile = fetchSDKFile' fetchurl;
 
     in
+    assert lib.assertMsg (withLlvm -> isSdk1)
+      "zephyr-nix: SDK ${version} has no LLVM toolchain. Use SDK 1.0 or later.";
     stdenv.mkDerivation {
       pname = "zephyr-sdk";
       inherit version;
 
       srcs = [
         (fetchSDKFile "zephyr-sdk-${version}_${platform}-${arch}_minimal.tar.xz")
-      ] ++ map fetchSDKFile (map (target: "toolchain_${toolchainPlatform}-${arch}_${target}.tar.xz") targets);
+      ] ++ map fetchSDKFile (map (target: "toolchain_${toolchainPlatform}-${arch}_${target}.tar.xz") targets)
+        ++ lib.optional withLlvm (fetchSDKFile "toolchain_llvm_${platform}-${arch}.tar.xz");
 
       passthru = {
-        inherit platform arch targets;
+        inherit platform arch targets withLlvm;
       };
 
       nativeBuildInputs = [
@@ -95,7 +105,9 @@ in {
         python3
         ncurses
         libxcrypt-legacy
-      ];
+      ]
+      # The LLVM binaries of the SDK link libz.so.1.
+      ++ lib.optional withLlvm zlib;
 
       dontBuild = true;
       dontUseCmakeConfigure = true;
@@ -111,7 +123,7 @@ in {
         mv zephyr-sdk-$version $out
 
         if [ -n "$(ls -A .)" ]; then
-          ${if builtins.compareVersions version "1.0.0" >= 0 then ''
+          ${if isSdk1 then ''
             mkdir -p $out/gnu
 
             # Move gnu toolchains
@@ -119,7 +131,8 @@ in {
               [ -e "$item" ] && mv "$item" $out/gnu/
             done
 
-            # Move any remaining items
+            # The cmake files of the SDK find the LLVM toolchain in llvm/ at
+            # the root of the SDK.
             for item in *; do
               [ -e "$item" ] && mv "$item" $out/ || true
             done
@@ -137,6 +150,9 @@ in {
       '';
     }) {
       inherit python3;
+      # Not filled in by callPackage, so that a package named withLlvm in
+      # the caller's package set cannot select the LLVM toolchain.
+      withLlvm = false;
     };
 
   # SDK with all targets selected
@@ -159,6 +175,7 @@ in {
     in
       self.sdk.override {
         targets = allTargets;
+        withLlvm = isSdk1;
       };
 
   # Binary host tools provided by the Zephyr project.

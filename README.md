@@ -18,9 +18,23 @@ Develop Zephyr projects using Nix
   }
   ```
 
+  SDK 1.0 and later also have an LLVM toolchain. Set `withLlvm` to add it:
+
+  ``` nix
+  sdk.override {
+    targets = [
+      "arm-zephyr-eabi"
+    ];
+    withLlvm = true;
+  }
+  ```
+
+  Then select it with `-DZEPHYR_TOOLCHAIN_VARIANT=zephyr/llvm`. The LLVM toolchain
+  is in `$ZEPHYR_SDK_INSTALL_DIR/llvm`.
+
   * `sdkFull`
 
-  SDK with all targets enabled.
+  SDK with all targets enabled. For SDK 1.0 and later, it also has the LLVM toolchain.
 
 * Host tools packaging
 
