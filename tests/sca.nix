@@ -57,12 +57,17 @@ let
         tool
         cmake
         ninja
+        jq
       ];
 
       buildPhase = ''
         runHook preBuild
 
+        export HOME=$TMPDIR
+
         # The Nix store is read-only, and the fixture changes main.c.
+        # CodeChecker also cannot put files with the timestamps of the Nix
+        # store into a ZIP archive.
         cp -r ${zephyr-src} zephyr
         chmod -R u+w zephyr
         cat ${./sca-fixture.c} >> zephyr/samples/hello_world/src/main.c
@@ -111,6 +116,22 @@ lib.mapAttrs mkCheck {
     verify = ''
       grep -rlq "Dereference of null pointer" build/sca/clang \
         || fail "the clang static analyzer did not report the fixture"
+    '';
+  };
+
+  codechecker = {
+    tool = zephyr-nix.sca.codechecker;
+    verify = ''
+      plist=build/sca/codechecker/codechecker.plist
+      jq -e '.tools[0].analyzers
+        | (keys | contains(["clangsa", "clang-tidy", "cppcheck"]))
+          and all(.[].analyzer_statistics; .successful > 0 and .failed == 0)' \
+        $plist/metadata.json \
+        || fail "an analyzer of CodeChecker did not run, or failed"
+      grep -q '<string>core.NullDereference</string>' $plist/main.c_clangsa_*.plist \
+        || fail "clangsa did not report the fixture"
+      grep -q '<string>cppcheck-nullPointer</string>' $plist/main.c_cppcheck_*.plist \
+        || fail "cppcheck did not report the fixture"
     '';
   };
 }

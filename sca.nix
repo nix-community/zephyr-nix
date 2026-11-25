@@ -1,14 +1,46 @@
 # nixpkgs makes these tools for the host: their wrappers add the host glibc
 # and GCC headers. A Zephyr target must use the headers and runtimes of the
 # Zephyr SDK instead.
+#
+# The clang based tools find the target runtimes (multilib.yaml, picolibc)
+# relative to the install directory of their driver. They are not in nixpkgs,
+# only in the LLVM toolchain of the SDK, so the wrappers point the driver to
+# the SDK of the build at run time. A copy of the SDK here would add a second
+# LLVM toolchain to the closure, and it could differ from the one that
+# compiles the code.
 {
   lib,
   symlinkJoin,
   makeWrapper,
+  writeShellApplication,
   llvmPackages,
+  codechecker,
 }:
 
 let
+  sdkLlvmBin = ''
+    if [ ! -x "''${ZEPHYR_SDK_INSTALL_DIR:-}/llvm/bin/clang" ]; then
+      echo "zephyr-nix: ZEPHYR_SDK_INSTALL_DIR must point to an SDK with the LLVM toolchain (sdk.override { withLlvm = true; })" >&2
+      exit 1
+    fi
+    sdk_llvm_bin=$ZEPHYR_SDK_INSTALL_DIR/llvm/bin
+  '';
+
+  # The unwrapped nixpkgs binaries do not find the builtin headers of their
+  # own clang, because nixpkgs puts them in another output.
+  resourceDir = clang: "-resource-dir=${clang}/resource-root";
+
+  clang-tidy = writeShellApplication {
+    name = "clang-tidy";
+    text = ''
+      ${sdkLlvmBin}
+      exec ${llvmPackages.clang-unwrapped}/bin/clang-tidy \
+        --extra-arg-before=-ccc-install-dir --extra-arg-before="$sdk_llvm_bin" \
+        --extra-arg-before=${resourceDir llvmPackages.clang} \
+        "$@"
+    '';
+  };
+
   tools = {
     # analyze-build is in the `python` output of clang, but its libscanbuild
     # module is in the `lib` output.
@@ -22,6 +54,29 @@ let
       '';
       meta.mainProgram = "analyze-build";
     };
+
+    # Zephyr always configures cppcheck. clangsa runs the clang of the SDK,
+    # because the nixpkgs clang does not find the target runtimes. The SDK
+    # has no clang-tidy.
+    codechecker =
+      let
+        base = codechecker.override { withCppcheck = true; };
+      in
+      symlinkJoin {
+        name = "zephyr-sca-codechecker-${base.version}";
+        paths = [ base ];
+        nativeBuildInputs = [ makeWrapper ];
+        postBuild = ''
+          wrapProgram $out/bin/CodeChecker \
+            --run ${lib.escapeShellArg sdkLlvmBin} \
+            --run 'export PATH=${lib.getBin clang-tidy}/bin:$sdk_llvm_bin:$PATH'
+          # CodeChecker propagates its Python interpreter and modules. In a
+          # shell, they would come before the pythonEnv of Zephyr on PATH and
+          # PYTHONPATH. The wrapper does not need them.
+          rm -r $out/nix-support
+        '';
+        meta.mainProgram = "CodeChecker";
+      };
   };
 in
 lib.recurseIntoAttrs (
