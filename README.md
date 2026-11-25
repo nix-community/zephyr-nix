@@ -18,9 +18,23 @@ Develop Zephyr projects using Nix
   }
   ```
 
+  SDK 1.0 and later also have an LLVM toolchain. Set `withLlvm` to add it:
+
+  ``` nix
+  sdk.override {
+    targets = [
+      "arm-zephyr-eabi"
+    ];
+    withLlvm = true;
+  }
+  ```
+
+  Then select it with `-DZEPHYR_TOOLCHAIN_VARIANT=zephyr/llvm`. The LLVM toolchain
+  is in `$ZEPHYR_SDK_INSTALL_DIR/llvm`.
+
   * `sdkFull`
 
-  SDK with all targets enabled.
+  SDK with all targets enabled. For SDK 1.0 and later, it also has the LLVM toolchain.
 
 * Host tools packaging
 
@@ -32,6 +46,13 @@ Develop Zephyr projects using Nix
   * `hosttools-nix`
 
   A re-packaging of the Zephyr SDK hosttools using nixpkgs packages.
+
+* Static code analysis tools
+
+  * `sca`
+
+  Tools for the static code analysis variants of Zephyr. See
+  [Static code analysis](#static-code-analysis).
 
 ## Basic usage
 
@@ -186,6 +207,63 @@ zephyr.overrideScope (final: prev: {
   openocd-zephyr = prev.openocd-zephyr.overrideAttrs (old: { ... });
 })
 ```
+
+## Static code analysis
+
+Zephyr runs a static code analysis (SCA) tool when you build with
+`-DZEPHYR_SCA_VARIANT=<variant>`. Zephyr finds the tool on `PATH`. The `sca` set has a package for
+each variant that needs a tool. Its attribute has the name of the variant:
+
+| Variant       | Package           | Toolchain                                      |
+|---------------|-------------------|------------------------------------------------|
+| `gcc`         | none              | GNU toolchain of the SDK                       |
+| `dtdoctor`    | none              | Any (uses `pythonEnv`)                         |
+| `clang`       | `sca.clang`       | An LLVM toolchain                              |
+| `codechecker` | `sca.codechecker` | LLVM toolchain of the SDK                      |
+| `iwyu`        | `sca.iwyu`        | LLVM toolchain of the SDK                      |
+| `sparse`      | `sca.sparse`      | GNU toolchain of the SDK                       |
+
+`sca.all` has all the tools. Flakes have them as `sca-<variant>` and `sca-all`.
+
+``` nix
+mkShell {
+  packages = [
+    (zephyr.sdk.override { withLlvm = true; })
+    zephyr.pythonEnv
+    zephyr.sca.clang
+    cmake
+    ninja
+  ];
+}
+```
+
+``` sh
+west build -b qemu_cortex_m3 samples/hello_world -- \
+  -DZEPHYR_TOOLCHAIN_VARIANT=zephyr/llvm -DZEPHYR_SCA_VARIANT=clang
+```
+
+The tools come from nixpkgs, which makes them for the host. These packages make them use the
+headers and runtimes of the Zephyr SDK:
+
+* The clang based tools do not know the GCC flags in the compile commands of the GNU toolchain, so
+  they need an LLVM toolchain. `sca.clang` runs the clang that Zephyr builds with, for example
+  `zephyr/llvm` or `host/llvm`. The checks of `zephyr-nix` use `zephyr/llvm`.
+* `sca.codechecker` and `sca.iwyu` use the target runtimes of the LLVM toolchain in
+  `$ZEPHYR_SDK_INSTALL_DIR`, so use an SDK with `withLlvm = true` and build with
+  `-DZEPHYR_TOOLCHAIN_VARIANT=zephyr/llvm`. `sca.codechecker` runs the clang static analyzer with
+  the clang of the SDK, and clang-tidy and cppcheck from nixpkgs.
+* `sca.sparse` uses the include directories and the predefined macros of the target compiler.
+  sparse does not support `__has_include` or the `packed` attribute on enums, and it reports
+  `invalid initializer` errors for the deferred logging macros of Zephyr (`CONFIG_LOG`). Code that
+  uses them, for example the Espressif HAL, gets errors that are not defects. nixpkgs has sparse
+  only for Linux.
+
+Some variants do not stop the build when the tool fails. Look at the output of the tool in
+`build/sca/<variant>`, or in the build log for `iwyu`.
+
+The other variants (`coverity`, `cpptest`, `eclair`, `iar_c_stat` and `polyspace`) use commercial
+tools, which `zephyr-nix` cannot package. Install the tool as its vendor documents, and add its
+`bin` directory to `PATH`, for example with `shellHook`.
 
 ## Using specific SDK versions
 
