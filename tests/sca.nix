@@ -134,4 +134,12 @@ lib.mapAttrs mkCheck {
         || fail "cppcheck did not report the fixture"
     '';
   };
+
+  iwyu = {
+    tool = zephyr-nix.sca.iwyu;
+    verify = ''
+      grep -Eq "hello_world/src/main.c (should add these lines|has correct #includes)" build.log \
+        || fail "include-what-you-use did not analyze main.c"
+    '';
+  };
 }

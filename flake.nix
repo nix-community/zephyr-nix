@@ -94,6 +94,7 @@
                 # The SCA checks and sca-all build these.
                 "sca-clang"
                 "sca-codechecker"
+                "sca-iwyu"
               ]
             )
           ) (nixpkgs.lib.getAttrs [ "x86_64-linux" ] self.checks);

@@ -220,6 +220,7 @@ each variant that needs a tool. Its attribute has the name of the variant:
 | `dtdoctor`    | none              | Any (uses `pythonEnv`)                         |
 | `clang`       | `sca.clang`       | An LLVM toolchain                              |
 | `codechecker` | `sca.codechecker` | LLVM toolchain of the SDK                      |
+| `iwyu`        | `sca.iwyu`        | LLVM toolchain of the SDK                      |
 
 `sca.all` has all the tools. Flakes have them as `sca-<variant>` and `sca-all`.
 
@@ -246,13 +247,13 @@ headers and runtimes of the Zephyr SDK:
 * The clang based tools do not know the GCC flags in the compile commands of the GNU toolchain, so
   they need an LLVM toolchain. `sca.clang` runs the clang that Zephyr builds with, for example
   `zephyr/llvm` or `host/llvm`. The checks of `zephyr-nix` use `zephyr/llvm`.
-* `sca.codechecker` uses the target runtimes of the LLVM toolchain in
+* `sca.codechecker` and `sca.iwyu` use the target runtimes of the LLVM toolchain in
   `$ZEPHYR_SDK_INSTALL_DIR`, so use an SDK with `withLlvm = true` and build with
   `-DZEPHYR_TOOLCHAIN_VARIANT=zephyr/llvm`. `sca.codechecker` runs the clang static analyzer with
   the clang of the SDK, and clang-tidy and cppcheck from nixpkgs.
 
 Some variants do not stop the build when the tool fails. Look at the output of the tool in
-`build/sca/<variant>`.
+`build/sca/<variant>`, or in the build log for `iwyu`.
 
 The other variants (`coverity`, `cpptest`, `eclair`, `iar_c_stat` and `polyspace`) use commercial
 tools, which `zephyr-nix` cannot package. Install the tool as its vendor documents, and add its

@@ -15,6 +15,7 @@
   writeShellApplication,
   llvmPackages,
   codechecker,
+  include-what-you-use,
 }:
 
 let
@@ -77,6 +78,18 @@ let
         '';
         meta.mainProgram = "CodeChecker";
       };
+
+    # The nixpkgs wrapper adds the host glibc headers with CPATH, so use the
+    # unwrapped binary.
+    iwyu = writeShellApplication {
+      name = "include-what-you-use";
+      text = ''
+        ${sdkLlvmBin}
+        exec ${include-what-you-use}/bin/.include-what-you-use-unwrapped \
+          -ccc-install-dir "$sdk_llvm_bin" ${resourceDir include-what-you-use.clang} \
+          "$@"
+      '';
+    };
   };
 in
 lib.recurseIntoAttrs (
