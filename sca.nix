@@ -10,12 +10,14 @@
 # compiles the code.
 {
   lib,
+  stdenv,
   symlinkJoin,
   makeWrapper,
   writeShellApplication,
   llvmPackages,
   codechecker,
   include-what-you-use,
+  sparse,
 }:
 
 let
@@ -90,6 +92,26 @@ let
           "$@"
       '';
     };
+  }
+  # nixpkgs supports sparse only on Linux.
+  // lib.optionalAttrs (lib.meta.availableOn stdenv.hostPlatform sparse) {
+    sparse =
+      let
+        cgcc = writeShellApplication {
+          name = "cgcc";
+          runtimeEnv.SPARSE = sparse;
+          text = builtins.readFile ./sca-cgcc.sh;
+        };
+      in
+      symlinkJoin {
+        name = "zephyr-sca-sparse-${sparse.version}";
+        # The cgcc wrapper must come first to hide the cgcc of sparse.
+        paths = [
+          cgcc
+          sparse
+        ];
+        meta.mainProgram = "cgcc";
+      };
   };
 in
 lib.recurseIntoAttrs (

@@ -95,6 +95,7 @@
                 "sca-clang"
                 "sca-codechecker"
                 "sca-iwyu"
+                "sca-sparse"
               ]
             )
           ) (nixpkgs.lib.getAttrs [ "x86_64-linux" ] self.checks);

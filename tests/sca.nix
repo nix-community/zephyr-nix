@@ -30,6 +30,20 @@ let
       hash = "sha256-IiE4Wzh1aWgPI589n7CaoDM8l25KtrRsGwUF0r74b18=";
     };
 
+  # The Xtensa boards need the hal_xtensa module.
+  hal_xtensa =
+    let
+      rev = "60224c27bed1466287f0246ac04c902b92331c29";
+    in
+    assert lib.assertMsg (lib.hasInfix rev (builtins.readFile "${zephyr-src}/west.yml"))
+      "zephyr-nix: set the hal_xtensa revision in tests/sca.nix to the one in the west.yml of Zephyr.";
+    fetchFromGitHub {
+      owner = "zephyrproject-rtos";
+      repo = "hal_xtensa";
+      inherit rev;
+      hash = "sha256-YOAUyNhENoxGSp5WEndvaWdXiy61jGPHzGFg4xyoq8o=";
+    };
+
   mkCheck =
     variant:
     {
@@ -40,6 +54,8 @@ let
       board ? "qemu_cortex_m3",
       targets ? [ ],
       modules ? [ cmsis_6 ],
+      # The build target. Empty for all targets.
+      target ? "",
       verify,
     }:
     stdenvNoCC.mkDerivation {
@@ -79,7 +95,8 @@ let
           -DZEPHYR_SCA_VARIANT=${variant} \
           -DZEPHYR_MODULES=${lib.escapeShellArg (lib.concatStringsSep ";" modules)} \
           2>&1 | tee build.log
-        cmake --build build 2>&1 | tee -a build.log
+        cmake --build build ${lib.optionalString (target != "") "--target ${target}"} 2>&1 \
+          | tee -a build.log
 
         runHook postBuild
       '';
@@ -140,6 +157,27 @@ lib.mapAttrs mkCheck {
     verify = ''
       grep -Eq "hello_world/src/main.c (should add these lines|has correct #includes)" build.log \
         || fail "include-what-you-use did not analyze main.c"
+    '';
+  };
+
+  sparse = {
+    tool = zephyr-nix.sca.sparse;
+    toolchain = "zephyr";
+    # The board of the sparse documentation of Zephyr.
+    board = "intel_adsp/cavs25";
+    targets = [ "xtensa-intel_tgl_adsp_zephyr-elf" ];
+    modules = [ hal_xtensa ];
+    # The final image of this board needs west sign, which needs a west
+    # workspace. sparse runs when the sources compile.
+    target = "zephyr/zephyr.elf";
+    # Without the macros of the target compiler, sparse reports errors in the
+    # headers of the target, for example "Endianess not declared".
+    verify = ''
+      grep -q "symbol 'zephyr_nix_sca_fixture' was not declared" build.log \
+        || fail "sparse did not report the fixture"
+      if grep -E ':[0-9]+:[0-9]+: error:' build.log; then
+        fail "sparse reported errors"
+      fi
     '';
   };
 }

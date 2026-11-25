@@ -221,6 +221,7 @@ each variant that needs a tool. Its attribute has the name of the variant:
 | `clang`       | `sca.clang`       | An LLVM toolchain                              |
 | `codechecker` | `sca.codechecker` | LLVM toolchain of the SDK                      |
 | `iwyu`        | `sca.iwyu`        | LLVM toolchain of the SDK                      |
+| `sparse`      | `sca.sparse`      | GNU toolchain of the SDK                       |
 
 `sca.all` has all the tools. Flakes have them as `sca-<variant>` and `sca-all`.
 
@@ -251,6 +252,11 @@ headers and runtimes of the Zephyr SDK:
   `$ZEPHYR_SDK_INSTALL_DIR`, so use an SDK with `withLlvm = true` and build with
   `-DZEPHYR_TOOLCHAIN_VARIANT=zephyr/llvm`. `sca.codechecker` runs the clang static analyzer with
   the clang of the SDK, and clang-tidy and cppcheck from nixpkgs.
+* `sca.sparse` uses the include directories and the predefined macros of the target compiler.
+  sparse does not support `__has_include` or the `packed` attribute on enums, and it reports
+  `invalid initializer` errors for the deferred logging macros of Zephyr (`CONFIG_LOG`). Code that
+  uses them, for example the Espressif HAL, gets errors that are not defects. nixpkgs has sparse
+  only for Linux.
 
 Some variants do not stop the build when the tool fails. Look at the output of the tool in
 `build/sca/<variant>`, or in the build log for `iwyu`.
