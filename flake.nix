@@ -41,6 +41,7 @@
           "newScope"
           "packages"
           "sdks"
+          "sca"
         ];
 
         # Build zephyr-nix against a package set provided by the caller.
@@ -62,7 +63,22 @@
           zephyr-nix = mkZephyr { pkgs = final; };
         };
 
-        checks = self.packages;
+        checks = self.packages // {
+          # CI runs only x86_64-linux.
+          x86_64-linux =
+            let
+              pkgs = nixpkgs.legacyPackages.x86_64-linux;
+            in
+            self.packages.x86_64-linux
+            // lib.mapAttrs' (name: lib.nameValuePair "sca-check-${name}") (
+              clean (
+                pkgs.callPackage ./tests/sca.nix {
+                  zephyr-src = zephyr;
+                  zephyr-nix = mkZephyr { inherit pkgs; };
+                }
+              )
+            );
+        };
 
         githubActions = nix-github-actions.lib.mkGithubMatrix {
           # Filter out unversioned (latest SDK) attributes for less CI jobs.
@@ -75,6 +91,8 @@
                 "hosttools"
                 "sdk"
                 "sdkFull"
+                # The SCA checks and sca-all build these.
+                "sca-clang"
               ]
             )
           ) (nixpkgs.lib.getAttrs [ "x86_64-linux" ] self.checks);
@@ -104,6 +122,9 @@
               ]) sdks'
             )
           ))
+          // lib.mapAttrs' (name: nameValuePair "sca-${name}") (
+            lib.filterAttrs (_: lib.isDerivation) packages'.sca
+          )
         );
       }
     );

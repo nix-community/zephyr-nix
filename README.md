@@ -47,6 +47,13 @@ Develop Zephyr projects using Nix
 
   A re-packaging of the Zephyr SDK hosttools using nixpkgs packages.
 
+* Static code analysis tools
+
+  * `sca`
+
+  Tools for the static code analysis variants of Zephyr. See
+  [Static code analysis](#static-code-analysis).
+
 ## Basic usage
 
 - `shell.nix`
@@ -200,6 +207,51 @@ zephyr.overrideScope (final: prev: {
   openocd-zephyr = prev.openocd-zephyr.overrideAttrs (old: { ... });
 })
 ```
+
+## Static code analysis
+
+Zephyr runs a static code analysis (SCA) tool when you build with
+`-DZEPHYR_SCA_VARIANT=<variant>`. Zephyr finds the tool on `PATH`. The `sca` set has a package for
+each variant that needs a tool. Its attribute has the name of the variant:
+
+| Variant       | Package           | Toolchain                                      |
+|---------------|-------------------|------------------------------------------------|
+| `gcc`         | none              | GNU toolchain of the SDK                       |
+| `dtdoctor`    | none              | Any (uses `pythonEnv`)                         |
+| `clang`       | `sca.clang`       | An LLVM toolchain                              |
+
+`sca.all` has all the tools. Flakes have them as `sca-<variant>` and `sca-all`.
+
+``` nix
+mkShell {
+  packages = [
+    (zephyr.sdk.override { withLlvm = true; })
+    zephyr.pythonEnv
+    zephyr.sca.clang
+    cmake
+    ninja
+  ];
+}
+```
+
+``` sh
+west build -b qemu_cortex_m3 samples/hello_world -- \
+  -DZEPHYR_TOOLCHAIN_VARIANT=zephyr/llvm -DZEPHYR_SCA_VARIANT=clang
+```
+
+The tools come from nixpkgs, which makes them for the host. These packages make them use the
+headers and runtimes of the Zephyr SDK:
+
+* The clang based tools do not know the GCC flags in the compile commands of the GNU toolchain, so
+  they need an LLVM toolchain. `sca.clang` runs the clang that Zephyr builds with, for example
+  `zephyr/llvm` or `host/llvm`. The checks of `zephyr-nix` use `zephyr/llvm`.
+
+Some variants do not stop the build when the tool fails. Look at the output of the tool in
+`build/sca/<variant>`.
+
+The other variants (`coverity`, `cpptest`, `eclair`, `iar_c_stat` and `polyspace`) use commercial
+tools, which `zephyr-nix` cannot package. Install the tool as its vendor documents, and add its
+`bin` directory to `PATH`, for example with `shellHook`.
 
 ## Using specific SDK versions
 

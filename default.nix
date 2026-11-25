@@ -42,6 +42,8 @@ in {
   inherit (sdks.latest) sdk sdkFull hosttools;
   inherit sdks;
 
+  sca = callPackage ./sca.nix { };
+
   # Zephyr/west Python environment.
   pythonEnv = callPackage ./python.nix {
     inherit zephyr-src;
